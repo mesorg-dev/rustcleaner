@@ -1,0 +1,348 @@
+import { Button, CheckBox, LineEdit, ScrollView } from "std-widgets.slint";
+
+export struct FileItem {
+    id: int,
+    name: string,
+    path: string,
+    extension: string,
+    size: string,
+    tags: string,
+    selected: bool,
+}
+
+export component App inherits Window {
+    title: "RustCleaner";
+    preferred-width: 1080px;
+    preferred-height: 760px;
+    background: #10151d;
+
+    in-out property <string> root-path: "";
+    in-out property <string> search: "";
+    in-out property <string> extension-filter: "";
+    in-out property <string> status: "Выберите папку для анализа";
+    in-out property <[FileItem]> files: [];
+    in-out property <bool> confirm-delete: false;
+    in-out property <bool> sort-by-extension: false;
+    in-out property <bool> android-platform: false;
+
+    callback choose-folder();
+    callback scan-folder();
+    callback selection-changed(int, bool);
+    callback select-all();
+    callback request-delete();
+    callback confirm-delete-files();
+    callback search-changed(string);
+    callback extension-filter-changed(string);
+    callback toggle-sort-by-extension();
+
+    VerticalLayout {
+        x: root.safe-area-insets.left + 18px;
+        y: root.safe-area-insets.top + 18px;
+        width: root.width - root.safe-area-insets.left - root.safe-area-insets.right - 36px;
+        height: root.height - root.safe-area-insets.top - root.safe-area-insets.bottom - 36px;
+        padding: 22px;
+        spacing: 14px;
+
+        HorizontalLayout {
+            height: 52px;
+            spacing: 12px;
+            Text {
+                text: "RustCleaner";
+                color: #f3f6fb;
+                font-size: 30px;
+                font-weight: 700;
+                vertical-alignment: center;
+            }
+            if root.width >= 700px: Text {
+                text: "Поиск дубликатов и крупных установщиков";
+                color: #9daabd;
+                font-size: 15px;
+                vertical-alignment: center;
+            }
+        }
+
+        if root.width >= 700px: Rectangle {
+            height: 54px;
+            background: #1b2430;
+            border-radius: 9px;
+            HorizontalLayout {
+                padding: 8px;
+                spacing: 8px;
+                LineEdit {
+                    text <=> root.root-path;
+                    placeholder-text: "Путь к папке";
+                    read-only: root.android-platform;
+                }
+                Button {
+                    text: "Выбрать папку";
+                    clicked => { root.choose-folder(); }
+                }
+                Button {
+                    text: "Сканировать";
+                    clicked => { root.scan-folder(); }
+                }
+            }
+        }
+
+        if root.width < 700px: VerticalLayout {
+            spacing: 8px;
+            Rectangle {
+                height: 48px;
+                background: #1b2430;
+                border-radius: 9px;
+                HorizontalLayout {
+                    padding: 6px;
+                    spacing: 6px;
+                    LineEdit {
+                        text <=> root.root-path;
+                        placeholder-text: "Выберите папку";
+                        read-only: root.android-platform;
+                    }
+                    Button {
+                        text: "Папка";
+                        clicked => { root.choose-folder(); }
+                    }
+                }
+            }
+            Button {
+                text: "Сканировать";
+                clicked => { root.scan-folder(); }
+            }
+        }
+
+        if root.width >= 700px: HorizontalLayout {
+            height: 42px;
+            spacing: 8px;
+            LineEdit {
+                text <=> root.search;
+                placeholder-text: "Поиск по имени или пути";
+                edited => { root.search-changed(self.text); }
+            }
+            LineEdit {
+                text <=> root.extension-filter;
+                placeholder-text: "Фильтр расширения, например .pdf";
+                edited => { root.extension-filter-changed(self.text); }
+            }
+            Button {
+                text: "Выбрать все";
+                clicked => { root.select-all(); }
+            }
+            Button {
+                text: "Удалить выбранное";
+                clicked => { root.request-delete(); }
+            }
+        }
+
+        if root.width < 700px: VerticalLayout {
+            spacing: 8px;
+            LineEdit {
+                text <=> root.search;
+                placeholder-text: "Поиск по имени или пути";
+                edited => { root.search-changed(self.text); }
+            }
+            LineEdit {
+                text <=> root.extension-filter;
+                placeholder-text: "Фильтр расширения, например .pdf";
+                edited => { root.extension-filter-changed(self.text); }
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                Button {
+                    text: "Выбрать все";
+                    clicked => { root.select-all(); }
+                }
+                Button {
+                    text: "Удалить выбранное";
+                    clicked => { root.request-delete(); }
+                }
+            }
+        }
+
+        if root.width >= 700px: Rectangle {
+            height: 32px;
+            background: #202b39;
+            border-radius: 6px;
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                spacing: 10px;
+                Text {
+                    text: "Имя / путь";
+                    color: #b7c4d6;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                Button {
+                    text: "Расширение";
+                    clicked => { root.toggle-sort-by-extension(); }
+                }
+                Text {
+                    text: "Размер";
+                    color: #b7c4d6;
+                    vertical-alignment: center;
+                    width: 90px;
+                    horizontal-alignment: right;
+                }
+                Text {
+                    text: "Метки";
+                    color: #b7c4d6;
+                    vertical-alignment: center;
+                    width: 150px;
+                }
+            }
+        }
+
+        ScrollView {
+            VerticalLayout {
+                spacing: 5px;
+                for file[index] in root.files: Rectangle {
+                    height: root.width < 700px ? 92px : 64px;
+                    background: #18212c;
+                    border-radius: 5px;
+                    if root.width >= 700px: HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 10px;
+                        CheckBox {
+                            checked: file.selected;
+                            toggled => { root.selection-changed(file.id, self.checked); }
+                        }
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            alignment: center;
+                            spacing: 2px;
+                            Text {
+                                text: file.name;
+                                color: #edf2f8;
+                                font-size: 14px;
+                                overflow: elide;
+                            }
+                            Text {
+                                text: file.path;
+                                color: #8d9bb0;
+                                font-size: 11px;
+                                overflow: elide;
+                            }
+                        }
+                        Text {
+                            text: file.extension;
+                            color: #c4d0df;
+                            width: 90px;
+                            vertical-alignment: center;
+                        }
+                        Text {
+                            text: file.size;
+                            color: #c4d0df;
+                            width: 90px;
+                            horizontal-alignment: right;
+                            vertical-alignment: center;
+                        }
+                        Text {
+                            text: file.tags;
+                            color: #78d6b0;
+                            width: 150px;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                    }
+                    if root.width < 700px: HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 8px;
+                        CheckBox {
+                            checked: file.selected;
+                            toggled => { root.selection-changed(file.id, self.checked); }
+                        }
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            alignment: center;
+                            spacing: 2px;
+                            Text {
+                                text: file.name;
+                                color: #edf2f8;
+                                font-size: 14px;
+                                overflow: elide;
+                            }
+                            Text {
+                                text: file.path;
+                                color: #8d9bb0;
+                                font-size: 11px;
+                                overflow: elide;
+                            }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Text {
+                                    text: file.extension + " · " + file.size;
+                                    color: #c4d0df;
+                                    font-size: 11px;
+                                }
+                                Text {
+                                    text: file.tags;
+                                    color: #78d6b0;
+                                    font-size: 11px;
+                                    horizontal-stretch: 1;
+                                    overflow: elide;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Text {
+            text: root.status;
+            color: #b7c4d6;
+            height: 24px;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+
+    if root.confirm-delete: Rectangle {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: parent.height;
+        background: #000000aa;
+        TouchArea {
+            width: parent.width;
+            height: parent.height;
+        }
+        Rectangle {
+            width: min(parent.width - 32px, 420px);
+            height: 180px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            background: #202b39;
+            border-radius: 12px;
+            VerticalLayout {
+                padding: 22px;
+                spacing: 14px;
+                Text {
+                    text: "Удалить выбранные файлы?";
+                    color: #f3f6fb;
+                    font-size: 20px;
+                    font-weight: 700;
+                }
+                Text {
+                    text: "Windows переместит файлы в корзину; Android удалит их через выбранное хранилище.";
+                    color: #b7c4d6;
+                    wrap: word-wrap;
+                }
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 10px;
+                    Button {
+                        text: "Отмена";
+                        clicked => { root.confirm-delete = false; }
+                    }
+                    Button {
+                        text: "Удалить";
+                        clicked => { root.confirm-delete-files(); }
+                    }
+                }
+            }
+        }
+    }
+}
